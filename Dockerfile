@@ -22,8 +22,5 @@ RUN pip install playwright && playwright install chromium
 # Экспонируем порт Flask-приложения
 EXPOSE 5000
 
-COPY credentials.json credentials.json
-COPY token.pickle token.pickle
-
 # Запуск Flask
 CMD ["python", "app.py"]
