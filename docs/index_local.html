@@ -8,11 +8,12 @@
         body { font-family: sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; }
         textarea { width: 100%; height: 200px; margin-bottom: 20px; }
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
+        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
+
 <h1>📸 Создание скриншотов</h1>
 <textarea id="urls" placeholder="Вставьте по одной ссылке на строку..."></textarea>
 <button onclick="startScreenshots()">Создать скриншоты</button>
@@ -24,6 +25,8 @@
 </div>
 
 <script>
+    const API_BASE = "http://127.0.0.1:5000";
+
     let intervalId = null;
 
     function startScreenshots() {
@@ -33,7 +36,7 @@
             return;
         }
 
-        fetch("https://screenshot-backend.onrender.com/create", {
+        fetch(`${API_BASE}/create`, {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urls })
@@ -44,7 +47,7 @@
     }
 
     function updateStatus() {
-        fetch("https://screenshot-backend.onrender.com/status")
+        fetch(`${API_BASE}/status`)
             .then(res => res.json())
             .then(data => {
                 document.getElementById('log').textContent = data.log.join("\n");
@@ -53,13 +56,19 @@
                     clearInterval(intervalId);
                     if (data.folder_link) {
                         document.getElementById('link').innerHTML = `
-                <h3>✅ Скриншоты загружены</h3>
-                <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
-              `;
+              <h3>✅ Скриншоты загружены</h3>
+              <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
+            `;
+                    } else {
+                        document.getElementById('link').innerHTML = `
+              <h3>📦 Готово</h3>
+              <p><a href="${API_BASE}/download" download>Скачать ZIP архив</a></p>
+            `;
                     }
                 }
             });
     }
 </script>
+
 </body>
 </html>
