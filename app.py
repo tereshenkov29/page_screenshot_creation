@@ -4,6 +4,9 @@ from upload_to_shared_drive import upload_all_screenshots_to_shared_drive
 import threading
 import time
 import os
+import subprocess
+
+subprocess.run(["playwright", "install", "chromium"], check=True)
 
 app = Flask(__name__)
 
