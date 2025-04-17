@@ -6,6 +6,9 @@ import time
 import os
 import base64
 import subprocess
+from flask import send_file
+from zipfile import ZipFile
+import io
 
 subprocess.run(["playwright", "install", "chromium"], check=True)
 
@@ -103,6 +106,18 @@ def index():
 @app.route("/status")
 def status():
     return render_template_string(HTML_STATUS, log="\n".join(log_lines), folder_link=folder_link)
+
+@app.route("/download")
+def download_zip():
+    # Собираем все PNG-файлы из папки screenshots
+    memory_file = io.BytesIO()
+    with ZipFile(memory_file, 'w') as zf:
+        for filename in os.listdir("screenshots"):
+            if filename.endswith(".png"):
+                filepath = os.path.join("screenshots", filename)
+                zf.write(filepath, arcname=filename)
+    memory_file.seek(0)
+    return send_file(memory_file, download_name="screenshots.zip", as_attachment=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Скриншотер</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; }
+        textarea { width: 100%; height: 200px; margin-bottom: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<h1>📸 Создание скриншотов</h1>
+<textarea id="urls" placeholder="Вставьте по одной ссылке на строку..."></textarea>
+<button onclick="startScreenshots()">Создать скриншоты</button>
+
+<div id="status" class="hidden">
+    <h2>🔄 Статус выполнения</h2>
+    <pre id="log">Ожидание...</pre>
+    <div id="link"></div>
+</div>
+
+<script>
+    let intervalId = null;
+
+    function startScreenshots() {
+        const urls = document.getElementById('urls').value.trim();
+        if (!urls) {
+            alert("Пожалуйста, введите хотя бы одну ссылку.");
+            return;
+        }
+
+        fetch("https://screenshot-backend.onrender.com/create", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls })
+        }).then(() => {
+            document.getElementById('status').classList.remove('hidden');
+            intervalId = setInterval(updateStatus, 2000);
+        });
+    }
+
+    function updateStatus() {
+        fetch("https://screenshot-backend.onrender.com/status")
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('log').textContent = data.log.join("\n");
+
+                if (data.done) {
+                    clearInterval(intervalId);
+                    if (data.folder_link) {
+                        document.getElementById('link').innerHTML = `
+                <h3>✅ Скриншоты загружены</h3>
+                <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
+              `;
+                    }
+                }
+            });
+    }
+</script>
+</body>
+</html>

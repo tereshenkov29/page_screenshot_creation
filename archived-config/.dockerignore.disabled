@@ -5,7 +5,7 @@ __pycache__/
 *.log
 venv/
 .env
-token.pickle
+../token.pickle
 credentials.json
 service_account.json
 screenshots/
