@@ -33,7 +33,7 @@
             return;
         }
 
-        fetch("https://<RENDER-BACKEND-URL>/create", {
+        fetch("https://screenshot-backend.onrender.com/create", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urls })
@@ -44,7 +44,7 @@
     }
 
     function updateStatus() {
-        fetch("https://<RENDER-BACKEND-URL>/status")
+        fetch("https://screenshot-backend.onrender.com/status")
             .then(res => res.json())
             .then(data => {
                 document.getElementById('log').textContent = data.log.join("\n");
