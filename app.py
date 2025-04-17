@@ -3,6 +3,7 @@ from screenshot_playwright import take_fullpage_screenshot
 from upload_to_shared_drive import upload_all_screenshots_to_shared_drive
 import threading
 import time
+import os
 
 app = Flask(__name__)
 
@@ -97,4 +98,4 @@ def status():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
