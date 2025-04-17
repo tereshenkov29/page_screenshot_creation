@@ -4,9 +4,14 @@ from upload_to_shared_drive import upload_all_screenshots_to_shared_drive
 import threading
 import time
 import os
+import base64
 import subprocess
 
 subprocess.run(["playwright", "install", "chromium"], check=True)
+
+if not os.path.exists("token.pickle") and os.environ.get("TOKEN_PKL_B64"):
+    with open("token.pickle", "wb") as f:
+        f.write(base64.b64decode(os.environ["TOKEN_PKL_B64"]))
 
 app = Flask(__name__)
 
