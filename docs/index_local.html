@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Скриншотер</title>
     <style>
         body { font-family: sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; }
-        textarea { width: 100%; height: 200px; margin-bottom: 20px; }
+        textarea, input[type="text"] { width: 100%; margin-bottom: 20px; padding: 8px; }
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+        label { display: block; margin-bottom: 10px; }
+        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <h1>📸 Создание скриншотов</h1>
+
+<input type="text" id="siteName" placeholder="Введите название сайта (например: docs.google.com)" />
+
 <textarea id="urls" placeholder="Вставьте по одной ссылке на строку..."></textarea>
+
+<label><input type="checkbox" id="optionFull" /> Сделать скриншот всей страницы</label>
+<label><input type="checkbox" id="optionVisible" /> Сделать скриншот видимой части страницы</label>
+
 <button onclick="startScreenshots()">Создать скриншоты</button>
 
 <div id="status" class="hidden">
@@ -25,21 +33,28 @@
 </div>
 
 <script>
-    const API_BASE = "http://127.0.0.1:5000";
-
     let intervalId = null;
 
     function startScreenshots() {
+        const site = document.getElementById('siteName').value.trim();
         const urls = document.getElementById('urls').value.trim();
-        if (!urls) {
-            alert("Пожалуйста, введите хотя бы одну ссылку.");
+        const full = document.getElementById('optionFull').checked;
+        const visible = document.getElementById('optionVisible').checked;
+
+        if (!site || !urls || (!full && !visible)) {
+            alert("Пожалуйста, введите название сайта, хотя бы одну ссылку и выберите минимум одну опцию.");
             return;
         }
 
-        fetch(`${API_BASE}/create`, {
+        fetch("http://127.0.0.1:5000/create", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls })
+            body: JSON.stringify({
+                site,
+                urls,
+                full_page: full,
+                visible_page: visible
+            })
         }).then(() => {
             document.getElementById('status').classList.remove('hidden');
             intervalId = setInterval(updateStatus, 2000);
@@ -47,11 +62,10 @@
     }
 
     function updateStatus() {
-        fetch(`${API_BASE}/status`)
+        fetch("http://127.0.0.1:5000/status")
             .then(res => res.json())
             .then(data => {
                 document.getElementById('log').textContent = data.log.join("\n");
-
                 if (data.done) {
                     clearInterval(intervalId);
                     if (data.folder_link) {
@@ -59,16 +73,10 @@
               <h3>✅ Скриншоты загружены</h3>
               <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
             `;
-                    } else {
-                        document.getElementById('link').innerHTML = `
-              <h3>📦 Готово</h3>
-              <p><a href="${API_BASE}/download" download>Скачать ZIP архив</a></p>
-            `;
                     }
                 }
             });
     }
 </script>
-
 </body>
 </html>

@@ -9,8 +9,8 @@ import pickle
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
-# Вставь сюда ID папки в Shared Drive
-SHARED_DRIVE_FOLDER_ID = "179M2NAGyv5kNnVNrMUVsregISp7FcejD"  # ← замени на свой
+# Укажи ID папки в Shared Drive
+SHARED_DRIVE_FOLDER_ID = "179M2NAGyv5kNnVNrMUVsregISp7FcejD"  # ← замени на актуальный
 
 def authenticate():
     creds = None
@@ -29,20 +29,18 @@ def authenticate():
 
     return build("drive", "v3", credentials=creds)
 
-def create_subfolder(service, parent_folder_id, subfolder_name):
+def create_subfolder(service, parent_id, name):
     metadata = {
-        "name": subfolder_name,
+        "name": name,
         "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_folder_id]
+        "parents": [parent_id]
     }
-
     folder = service.files().create(
         body=metadata,
         fields="id",
         supportsAllDrives=True
     ).execute()
-
-    return folder.get("id")
+    return folder["id"]
 
 def upload_file(service, file_path, folder_id):
     file_name = os.path.basename(file_path)
@@ -53,37 +51,34 @@ def upload_file(service, file_path, folder_id):
     }
 
     media = MediaFileUpload(file_path, mimetype=mime_type)
-
-    file = service.files().create(
+    service.files().create(
         body=metadata,
         media_body=media,
         fields="id",
         supportsAllDrives=True
     ).execute()
 
-    return file.get("id")
-
-def upload_all_screenshots_to_shared_drive():
+def upload_all_screenshots_to_shared_drive(root_dir: str):
     service = authenticate()
 
-    today = datetime.now().strftime("%Y%m%d")
-    subfolder_name = f"Screenshots_{today}"
-    upload_folder_id = create_subfolder(service, SHARED_DRIVE_FOLDER_ID, subfolder_name)
+    root_folder_name = os.path.basename(root_dir)
+    main_folder_id = create_subfolder(service, SHARED_DRIVE_FOLDER_ID, root_folder_name)
 
-    folder_link = f"https://drive.google.com/drive/folders/{upload_folder_id}"
-    print(f"📁 Подпапка создана: {folder_link}")
+    folder_link = f"https://drive.google.com/drive/folders/{main_folder_id}"
+    print(f"📁 Основная папка создана: {folder_link}")
 
-    screenshot_dir = "screenshots"
-    files = [f for f in os.listdir(screenshot_dir) if f.endswith(".png")]
+    for subfolder in os.listdir(root_dir):
+        subfolder_path = os.path.join(root_dir, subfolder)
+        if os.path.isdir(subfolder_path):
+            subfolder_id = create_subfolder(service, main_folder_id, subfolder)
+            for file_name in os.listdir(subfolder_path):
+                if file_name.endswith(".png"):
+                    file_path = os.path.join(subfolder_path, file_name)
+                    upload_file(service, file_path, subfolder_id)
+                    print(f"✅ Загружено: {file_name}")
 
-    for file_name in files:
-        file_path = os.path.join(screenshot_dir, file_name)
-        upload_file(service, file_path, upload_folder_id)
-        print(f"✅ Загружено: {file_name}")
-
-    print(f"🎉 Все скриншоты отправлены в Shared Drive: {folder_link}")
+    print(f"🎉 Все файлы успешно загружены в: {folder_link}")
     return folder_link
 
-
 if __name__ == "__main__":
-    upload_all_screenshots_to_shared_drive()
+    print("🚫 Этот скрипт предназначен для использования как модуль.")

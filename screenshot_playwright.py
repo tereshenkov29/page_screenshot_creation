@@ -1,17 +1,18 @@
 import os
+import re
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
 
-def take_fullpage_screenshot(url: str) -> str:
-    output_dir = "screenshots"
-    os.makedirs(output_dir, exist_ok=True)
+def take_screenshot(url: str, base_folder: str, site_name: str, full_page=False, visible_only=False) -> list[str]:
+    if not (full_page or visible_only):
+        return []
 
-    # Формируем имя файла
-    safe_url = url.replace("https://", "").replace("http://", "").replace("/", "_")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    root_folder = os.path.join(base_folder, f"{date_str} - {site_name}")
+    safe_url = sanitize_filename(url)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{safe_url}_{timestamp}.png"
-    filepath = os.path.join(output_dir, filename)
+    saved_paths = []
 
     with sync_playwright() as p:
         chromium_executable = p.chromium.executable_path
@@ -22,22 +23,39 @@ def take_fullpage_screenshot(url: str) -> str:
             locale="nl"
         )
         page = context.new_page()
+
         try:
-            page.goto(url, wait_until="networkidle", timeout=120_000)
+            page.goto(url, timeout=30000)
+            page.wait_for_timeout(2000)
+
+            if visible_only:
+                visible_dir = os.path.join(root_folder, "visible_page_screenshots")
+                os.makedirs(visible_dir, exist_ok=True)
+                visible_path = os.path.join(visible_dir, f"{timestamp}_{safe_url}.png")
+                page.wait_for_timeout(500)
+                page.screenshot(path=visible_path, full_page=False)
+                print(f"✅ Скриншот видимой части сохранён: {visible_path}")
+                saved_paths.append(visible_path)
+
+            if full_page:
+                auto_scroll(page)
+                page.wait_for_timeout(1000)
+                full_dir = os.path.join(root_folder, "full_page_screenshots")
+                os.makedirs(full_dir, exist_ok=True)
+                full_path = os.path.join(full_dir, f"{timestamp}_{safe_url}.png")
+                page.screenshot(path=full_path, full_page=True)
+                print(f"✅ Скриншот всей страницы сохранён: {full_path}")
+                saved_paths.append(full_path)
+
+
         except Exception as e:
-            print(f"❌ Не удалось загрузить {url}: {e}")
-            return None
+            print(f"❌ Ошибка при обработке {url}: {e}")
 
-        auto_scroll(page)
-        page.wait_for_timeout(2000)
+        finally:
+            browser.close()
 
-        # Скриншот всей страницы
-        page.screenshot(path=filepath, full_page=True)
+    return saved_paths
 
-        print(f"✅ Скриншот сохранён: {filepath}")
-        browser.close()
-
-    return filepath
 
 def auto_scroll(page):
     page.evaluate("""
@@ -48,7 +66,6 @@ def auto_scroll(page):
                 const timer = setInterval(() => {
                     window.scrollBy(0, distance);
                     totalHeight += distance;
-
                     if (totalHeight >= document.body.scrollHeight) {
                         clearInterval(timer);
                         resolve();
@@ -58,6 +75,19 @@ def auto_scroll(page):
         }
     """)
 
-# Пример запуска
+
+def sanitize_filename(url: str) -> str:
+    clean_url = re.sub(r'^https?://', '', url)
+    clean_url = re.sub(r'[\\/*?:"<>|]', '_', clean_url)
+    return clean_url
+
+
+# Пример ручного вызова
 if __name__ == "__main__":
-    take_fullpage_screenshot("https://properaccess.nl/")
+    take_screenshot(
+        url="https://properaccess.nl/",
+        base_folder="screenshots",
+        site_name="properaccess.nl",
+        full_page=True,
+        visible_only=True
+    )
