@@ -3,30 +3,150 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Скриншотер</title>
+    <title>Скриншотер и Слепки</title>
     <style>
-        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; }
-        textarea, input[type="text"] { width: 100%; margin-bottom: 20px; padding: 8px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        label { display: block; margin-bottom: 10px; }
-        pre { background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
-        .hidden { display: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+            color: #212529;
+            padding: 0 20px;
+        }
+        h1, h2, h3 {
+            color: #343a40;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.2s, opacity 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            user-select: none;
+        }
+        label input[type="checkbox"] {
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        pre {
+            background: #e9ecef;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .hidden {
+            display: none;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .options-group {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .options-group legend {
+            font-weight: bold;
+            padding: 0 10px;
+        }
+        #warning {
+            color: #dc3545;
+            font-weight: bold;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        #link a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        #link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 
-<h1>📸 Создание скриншотов</h1>
+<div class="container">
+    <h1>📸 Создание скриншотов и слепков</h1>
 
-<input type="text" id="siteName" placeholder="Введите название сайта (например: docs.google.com)" />
+    <input type="text" id="siteName" placeholder="Введите название сайта (например: docs.google.com)" />
 
-<textarea id="urls" placeholder="Вставьте по одной ссылке на строку..."></textarea>
+    <label for="urls">Веб-страницы (по одной ссылке на строку)</label>
+    <textarea id="urls" placeholder="https://example.com/page1..." rows="6"></textarea>
 
-<label><input type="checkbox" id="optionFull" /> Сделать скриншот всей страницы</label>
-<label><input type="checkbox" id="optionVisible" /> Сделать скриншот видимой части страницы</label>
+    <label for="pdf_urls">PDF-файлы (по одной ссылке на строку)</label>
+    <textarea id="pdf_urls" placeholder="https://example.com/document.pdf..." rows="4"></textarea>
 
-<button onclick="startScreenshots()">Создать скриншоты</button>
+    <div id="warning" class="hidden"></div>
 
-<div id="status" class="hidden">
+    <fieldset class="options-group">
+        <legend>Основные опции</legend>
+        <label><input type="checkbox" id="optionVisible" checked />Сделать скриншот видимой части страницы</label>
+        <label><input type="checkbox" id="optionFull" />Сделать скриншот всей страницы (только для веб-страниц)</label>
+        <label><input type="checkbox" id="optionMHTML" />Сделать слепок страницы (MHTML, только для веб-страниц)</label>
+        <label><input type="checkbox" id="optionSavePdf" />Сохранить PDF как есть (слепок файла)</label>
+        <!-- === НОВЫЙ ЧЕКБОКС ДЛЯ ШИРИНЫ ЭКРАНА === -->
+        <label><input type="checkbox" id="optionWidth1280" />Сделать скриншот на ширине 1280px</label>
+    </fieldset>
+
+    <fieldset class="options-group">
+        <legend>Опции Cookie</legend>
+        <label>
+            <input type="checkbox" id="handleCookie" onchange="toggleCookieInput()"> На сайте есть cookie-баннер
+        </label>
+        <div id="cookieInputContainer" class="hidden">
+            <input type="text" id="cookieButtonText" placeholder="Введите точный текст на кнопке (например: Accept All)">
+        </div>
+    </fieldset>
+
+    <button id="startButton" onclick="startProcessing()">Запустить</button>
+</div>
+
+<div id="status" class="container hidden" style="margin-top: 30px;">
     <h2>🔄 Статус выполнения</h2>
     <pre id="log">Ожидание...</pre>
     <div id="link"></div>
@@ -34,47 +154,134 @@
 
 <script>
     let intervalId = null;
+    const startButton = document.getElementById('startButton');
+    const warningDiv = document.getElementById('warning');
+    const optionFullCheckbox = document.getElementById('optionFull');
+    const pdfUrlsTextarea = document.getElementById('pdf_urls');
 
-    function startScreenshots() {
+    function checkPdfOptions() {
+        const hasPdfUrls = pdfUrlsTextarea.value.trim() !== '';
+        if (hasPdfUrls && optionFullCheckbox.checked) {
+            warningDiv.textContent = '⚠️ Предупреждение: Опция "Скриншот всей страницы" недоступна для PDF и будет проигнорирована.';
+            warningDiv.classList.remove('hidden');
+        } else {
+            warningDiv.classList.add('hidden');
+        }
+    }
+
+    optionFullCheckbox.addEventListener('change', checkPdfOptions);
+    pdfUrlsTextarea.addEventListener('input', checkPdfOptions);
+
+
+    function toggleCookieInput() {
+        const container = document.getElementById('cookieInputContainer');
+        const isChecked = document.getElementById('handleCookie').checked;
+        container.classList.toggle('hidden', !isChecked);
+    }
+
+    function startProcessing() {
         const site = document.getElementById('siteName').value.trim();
         const urls = document.getElementById('urls').value.trim();
-        const full = document.getElementById('optionFull').checked;
-        const visible = document.getElementById('optionVisible').checked;
+        const pdf_urls = document.getElementById('pdf_urls').value.trim();
 
-        if (!site || !urls || (!full && !visible)) {
-            alert("Пожалуйста, введите название сайта, хотя бы одну ссылку и выберите минимум одну опцию.");
+        const visible = document.getElementById('optionVisible').checked;
+        const full = document.getElementById('optionFull').checked;
+        const mhtml = document.getElementById('optionMHTML').checked;
+        const save_pdf = document.getElementById('optionSavePdf').checked;
+        // --- ПОЛУЧАЕМ ЗНАЧЕНИЕ НОВОГО ЧЕКБОКСА ---
+        const use1280width = document.getElementById('optionWidth1280').checked;
+
+        const handleCookie = document.getElementById('handleCookie').checked;
+        const cookieButtonText = document.getElementById('cookieButtonText').value.trim();
+
+        if (!site) {
+            alert("Пожалуйста, введите название сайта.");
             return;
         }
+        if (!urls && !pdf_urls) {
+            alert("Пожалуйста, введите хотя бы одну ссылку на веб-страницу или PDF.");
+            return;
+        }
+        if (!visible && !full && !mhtml && !save_pdf) {
+            alert("Пожалуйста, выберите хотя бы одну опцию обработки.");
+            return;
+        }
+        if (handleCookie && !cookieButtonText) {
+            alert("Пожалуйста, введите текст с кнопки для закрытия cookie-баннера.");
+            return;
+        }
+
+        checkPdfOptions();
+
+        startButton.disabled = true;
+        startButton.textContent = 'В процессе...';
+        document.getElementById('log').textContent = "Инициализация...";
+        document.getElementById('link').innerHTML = "";
+        document.getElementById('status').classList.remove('hidden');
 
         fetch("http://127.0.0.1:5000/create", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                site,
-                urls,
+                site: site,
+                urls: urls,
+                pdf_urls: pdf_urls,
+                visible_page: visible,
                 full_page: full,
-                visible_page: visible
+                save_mhtml: mhtml,
+                save_pdf: save_pdf,
+                handle_cookie: handleCookie,
+                cookie_button_text: cookieButtonText,
+                // --- ДОБАВЛЯЕМ НОВОЕ ПОЛЕ В ЗАПРОС ---
+                use_1280_width: use1280width
             })
-        }).then(() => {
-            document.getElementById('status').classList.remove('hidden');
-            intervalId = setInterval(updateStatus, 2000);
-        });
+        })
+            .then(res => {
+                if (!res.ok) { return res.json().then(err => { throw new Error(err.error || 'Неизвестная ошибка сервера') }); }
+                return res.json();
+            })
+            .then(data => {
+                if (data.status === 'started') {
+                    intervalId = setInterval(updateStatus, 2000);
+                } else {
+                    throw new Error(data.error || 'Не удалось запустить задачу');
+                }
+            })
+            .catch(err => {
+                alert("Ошибка при запуске задачи: " + err.message);
+                startButton.disabled = false;
+                startButton.textContent = 'Запустить';
+            });
     }
 
     function updateStatus() {
         fetch("http://127.0.0.1:5000/status")
             .then(res => res.json())
             .then(data => {
-                document.getElementById('log').textContent = data.log.join("\n");
+                const logElement = document.getElementById('log');
+                logElement.textContent = data.log.join("\n");
+                logElement.scrollTop = logElement.scrollHeight;
+
                 if (data.done) {
                     clearInterval(intervalId);
+                    startButton.disabled = false;
+                    startButton.textContent = 'Запустить';
+
                     if (data.folder_link) {
                         document.getElementById('link').innerHTML = `
-              <h3>✅ Скриншоты загружены</h3>
-              <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
-            `;
+                            <h3>✅ Задача выполнена</h3>
+                            <p><a href="${data.folder_link}" target="_blank">Открыть папку в Google Drive</a></p>
+                        `;
+                    } else {
+                        document.getElementById('link').innerHTML = `<h3>✅ Задача выполнена, но ссылка на Drive не была создана.</h3>`;
                     }
                 }
+            })
+            .catch(err => {
+                clearInterval(intervalId);
+                startButton.disabled = false;
+                startButton.textContent = 'Запустить';
+                document.getElementById('log').textContent += "\n\n❌ Потеряно соединение с сервером.";
             });
     }
 </script>
