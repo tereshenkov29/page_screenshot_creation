@@ -9,6 +9,7 @@ import os
 import io
 import datetime
 import logging
+import re  # <-- ИМПОРТИРУЕМ МОДУЛЬ ДЛЯ РЕГУЛЯРНЫХ ВЫРАЖЕНИЙ
 
 # --- УЛУЧШЕНИЕ: Настройка логирования ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -55,8 +56,14 @@ def create():
     task_state.is_running = True
     task_state.log("🚀 Задача принята в работу...")
 
-    # --- ИЗМЕНЕНИЕ: Получаем все параметры из нового фронтенда ---
     site_name = data.get("site", "site")
+
+    # --- ДОРАБОТКА: Очистка имени сайта для создания корректного имени папки ---
+    if site_name:
+        # Заменяем все недопустимые для имени папки/файла символы на "_"
+        site_name = re.sub(r'[\\/*?:"<>|]', '_', site_name)
+    # -----------------------------------------------------------------------------
+
     urls_text = data.get("urls", "")
     pdf_urls_text = data.get("pdf_urls", "")
 
@@ -64,7 +71,6 @@ def create():
     visible_page = data.get("visible_page", False)
     full_page = data.get("full_page", False)
     save_mhtml = data.get("save_mhtml", False)
-    # --- НОВЫЙ ПАРАМЕТР: Получаем опцию ширины ---
     use_1280_width = data.get("use_1280_width", False)
 
     # Опции для PDF
@@ -97,7 +103,6 @@ def create():
                 task_state.log(f"--- Обработка {len(urls)} веб-страниц ---")
                 for url in urls:
                     try:
-                        # --- НОВЫЙ ПАРАМЕТР: Передаем опцию ширины в функцию ---
                         result_paths = take_screenshot(
                             url=url,
                             base_folder="screenshots",

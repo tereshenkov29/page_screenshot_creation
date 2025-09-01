@@ -30,23 +30,37 @@
             min-height: 120px;
             resize: vertical;
         }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
         button {
             padding: 12px 24px;
             font-size: 16px;
             cursor: pointer;
-            background-color: #007bff;
-            color: white;
             border: none;
             border-radius: 8px;
             transition: background-color 0.2s, opacity 0.2s;
         }
-        button:hover {
+        .primary-button {
+            background-color: #007bff;
+            color: white;
+        }
+        .primary-button:hover {
             background-color: #0056b3;
         }
-        button:disabled {
+        .primary-button:disabled {
             background-color: #6c757d;
             cursor: not-allowed;
             opacity: 0.7;
+        }
+        .secondary-button {
+            background-color: #6c757d;
+            color: white;
+        }
+        .secondary-button:hover {
+            background-color: #5a6268;
         }
         label {
             display: block;
@@ -113,6 +127,8 @@
 <div class="container">
     <h1>📸 Создание скриншотов и слепков</h1>
 
+    <!-- === ДОБАВЛЕНА МЕТКА (LABEL) === -->
+    <label for="siteName">Название сайта (для имени папки)</label>
     <input type="text" id="siteName" placeholder="Введите название сайта (например: docs.google.com)" />
 
     <label for="urls">Веб-страницы (по одной ссылке на строку)</label>
@@ -129,7 +145,6 @@
         <label><input type="checkbox" id="optionFull" />Сделать скриншот всей страницы (только для веб-страниц)</label>
         <label><input type="checkbox" id="optionMHTML" />Сделать слепок страницы (MHTML, только для веб-страниц)</label>
         <label><input type="checkbox" id="optionSavePdf" />Сохранить PDF как есть (слепок файла)</label>
-        <!-- === НОВЫЙ ЧЕКБОКС ДЛЯ ШИРИНЫ ЭКРАНА === -->
         <label><input type="checkbox" id="optionWidth1280" />Сделать скриншот на ширине 1280px</label>
     </fieldset>
 
@@ -143,7 +158,11 @@
         </div>
     </fieldset>
 
-    <button id="startButton" onclick="startProcessing()">Запустить</button>
+    <!-- === ДОБАВЛЕНА КНОПКА ОЧИСТКИ И КОНТЕЙНЕР ДЛЯ КНОПОК === -->
+    <div class="button-container">
+        <button id="startButton" onclick="startProcessing()" class="primary-button">Запустить</button>
+        <button type="button" onclick="clearInputs()" class="secondary-button">Очистить поля</button>
+    </div>
 </div>
 
 <div id="status" class="container hidden" style="margin-top: 30px;">
@@ -158,6 +177,15 @@
     const warningDiv = document.getElementById('warning');
     const optionFullCheckbox = document.getElementById('optionFull');
     const pdfUrlsTextarea = document.getElementById('pdf_urls');
+
+    // === НОВАЯ ФУНКЦИЯ ОЧИСТКИ ПОЛЕЙ ===
+    function clearInputs() {
+        document.getElementById('siteName').value = '';
+        document.getElementById('urls').value = '';
+        document.getElementById('pdf_urls').value = '';
+        document.getElementById('cookieButtonText').value = '';
+        // Чекбоксы не трогаем, как и просили
+    }
 
     function checkPdfOptions() {
         const hasPdfUrls = pdfUrlsTextarea.value.trim() !== '';
@@ -188,7 +216,6 @@
         const full = document.getElementById('optionFull').checked;
         const mhtml = document.getElementById('optionMHTML').checked;
         const save_pdf = document.getElementById('optionSavePdf').checked;
-        // --- ПОЛУЧАЕМ ЗНАЧЕНИЕ НОВОГО ЧЕКБОКСА ---
         const use1280width = document.getElementById('optionWidth1280').checked;
 
         const handleCookie = document.getElementById('handleCookie').checked;
@@ -232,7 +259,6 @@
                 save_pdf: save_pdf,
                 handle_cookie: handleCookie,
                 cookie_button_text: cookieButtonText,
-                // --- ДОБАВЛЯЕМ НОВОЕ ПОЛЕ В ЗАПРОС ---
                 use_1280_width: use1280width
             })
         })
