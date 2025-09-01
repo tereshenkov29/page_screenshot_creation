@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
-# --- ИЗМЕНЕНИЕ: Импортируем новые функции для обработки PDF и MHTML ---
+# --- ИЗМЕНЕНИЕ: Импортируем sync_playwright для управления браузером ---
+from playwright.sync_api import sync_playwright
 from screenshot_playwright import take_screenshot, process_pdf
 from upload_to_shared_drive import upload_all_screenshots_to_shared_drive
 from flask_cors import CORS
@@ -9,7 +10,7 @@ import os
 import io
 import datetime
 import logging
-import re  # <-- ИМПОРТИРУЕМ МОДУЛЬ ДЛЯ РЕГУЛЯРНЫХ ВЫРАЖЕНИЙ
+import re
 
 # --- УЛУЧШЕНИЕ: Настройка логирования ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -58,25 +59,17 @@ def create():
 
     site_name = data.get("site", "site")
 
-    # --- ДОРАБОТКА: Очистка имени сайта для создания корректного имени папки ---
     if site_name:
-        # Заменяем все недопустимые для имени папки/файла символы на "_"
         site_name = re.sub(r'[\\/*?:"<>|]', '_', site_name)
-    # -----------------------------------------------------------------------------
 
     urls_text = data.get("urls", "")
     pdf_urls_text = data.get("pdf_urls", "")
 
-    # Опции для веб-страниц
     visible_page = data.get("visible_page", False)
     full_page = data.get("full_page", False)
     save_mhtml = data.get("save_mhtml", False)
     use_1280_width = data.get("use_1280_width", False)
-
-    # Опции для PDF
     save_pdf = data.get("save_pdf", False)
-
-    # Опции Cookie
     handle_cookie = data.get("handle_cookie", False)
     cookie_button_text = data.get("cookie_button_text", "")
 
@@ -99,29 +92,55 @@ def create():
         try:
             successful_paths = []
 
+            # --- ИЗМЕНЕНИЕ: Логика запуска браузера вынесена сюда, в начало обработки URL ---
             if urls:
-                task_state.log(f"--- Обработка {len(urls)} веб-страниц ---")
-                for url in urls:
+                task_state.log("🖥️  Запускаю браузер для обработки веб-страниц...")
+                with sync_playwright() as p:
                     try:
-                        result_paths = take_screenshot(
-                            url=url,
-                            base_folder="screenshots",
-                            site_name=site_name,
-                            full_page=full_page,
-                            visible_only=visible_page,
-                            save_mhtml=save_mhtml,
-                            use_1280_width=use_1280_width,
-                            handle_cookie=handle_cookie,
-                            cookie_button_text=cookie_button_text,
-                            log_func=task_state.log
-                        )
-                        successful_paths.extend(result_paths)
-                    except Exception as e:
-                        task_state.log(f"❌ Ошибка при обработке страницы {url}: {e}")
+                        browser = p.chromium.launch(headless=True)
+                    except Exception:
+                        task_state.log("... Попытка установить браузеры Playwright...")
+                        os.system("playwright install")
+                        browser = p.chromium.launch(headless=True)
+
+                    context = browser.new_context(
+                        viewport={"width": 1920, "height": 1080},
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
+                    )
+                    page = context.new_page()
+
+                    task_state.log(f"--- Обработка {len(urls)} веб-страниц в одной сессии ---")
+                    for url in urls:
+                        task_state.log(f"▶️  Начинаю обработку: {url}")
+                        try:
+                            # --- ИЗМЕНЕНИЕ: Передаем объект 'page' в функцию ---
+                            result_paths = take_screenshot(
+                                page=page,  # <--- Передаем созданную страницу
+                                url=url,
+                                base_folder="screenshots",
+                                site_name=site_name,
+                                full_page=full_page,
+                                visible_only=visible_page,
+                                save_mhtml=save_mhtml,
+                                use_1280_width=use_1280_width,
+                                handle_cookie=handle_cookie,
+                                cookie_button_text=cookie_button_text,
+                                log_func=task_state.log
+                            )
+                            for path in result_paths:
+                                task_state.log(f"  ✅ Файл сохранен: {os.path.basename(path)}")
+                            successful_paths.extend(result_paths)
+                        except Exception as e:
+                            task_state.log(f"❌ Ошибка при обработке страницы {url}: {e}")
+
+                    task_state.log("🚪 Закрываю браузер...")
+                    browser.close()  # Закрываем браузер после цикла
 
             if pdf_urls:
                 task_state.log(f"--- Обработка {len(pdf_urls)} PDF-файлов ---")
                 for url in pdf_urls:
+                    task_state.log(f"▶️  Начинаю обработку PDF: {url}")
                     try:
                         result_paths = process_pdf(
                             url=url,
