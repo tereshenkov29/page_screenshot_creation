@@ -4,16 +4,12 @@ import codecs
 import shutil
 from datetime import datetime
 import requests
-# --- ИЗМЕНЕНИЕ: Импортируем 'Page' для подсказок типов, убираем 'sync_playwright' ---
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from pdf2image import convert_from_path
 
 
-#
-# --- ИЗМЕНЕНИЕ: Функция теперь принимает объект 'page' и больше не управляет браузером ---
-#
 def take_screenshot(
-        page: Page,  # <--- ГЛАВНОЕ ИЗМЕНЕНИЕ
+        page: Page,
         url: str,
         base_folder: str,
         site_name: str,
@@ -25,7 +21,7 @@ def take_screenshot(
         cookie_button_text: str = "",
         log_func=print
 ) -> list[str]:
-    """Обрабатывает URL веб-страницы на УЖЕ ОТКРЫТОЙ вкладке браузера."""
+    """Processes a web page URL on an ALREADY OPEN browser page."""
     if not (full_page or visible_only or save_mhtml):
         return []
 
@@ -36,31 +32,30 @@ def take_screenshot(
     saved_paths = []
 
     try:
-        # --- ИЗМЕНЕНИЕ: Установка ширины viewport для текущей страницы ---
         original_viewport_size = page.viewport_size
         if use_1280_width:
-            log_func("  📏 Устанавливаю ширину экрана 1280px")
+            log_func("  📏 Setting viewport width to 1280px")
             page.set_viewport_size({"width": 1280, "height": original_viewport_size['height']})
             page.wait_for_timeout(500)
 
-        log_func(f"  Перехожу по URL: {url}")
+        log_func(f"  Navigating to URL: {url}")
         page.goto(url, timeout=45000, wait_until="domcontentloaded")
         page.wait_for_timeout(2000)
 
         if handle_cookie and cookie_button_text:
-            log_func(f"  🍪 Ищу cookie-баннер с текстом '{cookie_button_text}'...")
+            log_func(f"  🍪 Searching for cookie banner with text '{cookie_button_text}'...")
             try:
                 cookie_button = page.locator(
                     f"xpath=//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{cookie_button_text.lower()}')]").first
                 cookie_button.wait_for(timeout=7000)
-                log_func("  ✅ Баннер найден, кликаю...")
+                log_func("  ✅ Banner found, clicking...")
                 cookie_button.click(force=True)
                 page.wait_for_timeout(1500)
-                log_func("  👍 Баннер успешно закрыт.")
+                log_func("  👍 Banner closed successfully.")
             except PlaywrightTimeoutError:
-                log_func(f"  ⚠️ Не удалось найти видимую кнопку cookie-баннера за 7 секунд.")
+                log_func(f"  ⚠️ Could not find a visible cookie banner button within 7 seconds.")
             except Exception as e:
-                log_func(f"  ❌ Произошла ошибка при обработке cookie-баннера: {e}")
+                log_func(f"  ❌ An error occurred while handling the cookie banner: {e}")
 
         scrolled = False
         if visible_only:
@@ -73,7 +68,7 @@ def take_screenshot(
 
         if full_page or save_mhtml:
             if not scrolled:
-                log_func("  📜 Прокручиваю страницу для загрузки всего контента...")
+                log_func("  📜 Scrolling the page to load all content...")
                 auto_scroll(page)
                 page.wait_for_timeout(1000)
                 scrolled = True
@@ -90,7 +85,6 @@ def take_screenshot(
             mhtml_dir = os.path.join(root_folder, "mhtml_pages")
             os.makedirs(mhtml_dir, exist_ok=True)
             mhtml_path = os.path.join(mhtml_dir, f"{timestamp}_{safe_url}.mhtml")
-            # --- ИЗМЕНЕНИЕ: Получаем CDP сессию из page.context ---
             cdp_session = page.context.new_cdp_session(page)
             mhtml_data = cdp_session.send("Page.captureSnapshot", {"format": "mhtml"})['data']
             cdp_session.detach()
@@ -99,21 +93,16 @@ def take_screenshot(
             saved_paths.append(mhtml_path)
 
     except PlaywrightTimeoutError:
-        log_func(f"❌ Ошибка: страница {url} не загрузилась за 45 секунд.")
+        log_func(f"❌ Error: Page {url} timed out after 45 seconds.")
     except Exception as e:
-        log_func(f"❌ Ошибка при обработке {url}: {e}")
+        log_func(f"❌ Error processing {url}: {e}")
     finally:
-        # --- ИЗМЕНЕНИЕ: Возвращаем viewport к исходному размеру, если он менялся ---
         if use_1280_width and page.viewport_size != original_viewport_size:
             page.set_viewport_size(original_viewport_size)
-        # БРАУЗЕР ЗДЕСЬ НЕ ЗАКРЫВАЕМ!
 
     return saved_paths
 
 
-#
-# --- ФУНКЦИЯ ОБРАБОТКИ PDF ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ ---
-#
 def process_pdf(
         url: str,
         base_folder: str,
@@ -122,8 +111,7 @@ def process_pdf(
         save_as_is: bool = False,
         log_func=print
 ) -> list[str]:
-    """Надежно обрабатывает URL PDF: скачивает, сохраняет и/или конвертирует в изображение."""
-    # ... (весь код этой функции остается прежним) ...
+    """Reliably processes a PDF URL: downloads, saves, and/or converts to an image."""
     if not (take_visible_screenshot or save_as_is):
         return []
 
@@ -133,8 +121,21 @@ def process_pdf(
     temp_pdf_path = None
 
     try:
-        log_func(f"  📄 Загружаю PDF для обработки: {url}")
-        response = requests.get(url, timeout=60, headers={'User-Agent': 'Mozilla/5.0'})
+        log_func(f"  📄 Downloading PDF for processing: {url}")
+
+        # --- CHANGE: Use a more comprehensive set of headers to mimic a real browser ---
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'DNT': '1'  # Do Not Track
+        }
+        response = requests.get(url, timeout=60, headers=headers)
+        # --- END CHANGE ---
+
         response.raise_for_status()
 
         try:
@@ -163,10 +164,10 @@ def process_pdf(
             final_save_path = os.path.join(pdf_dir, final_filename)
             shutil.copy2(temp_pdf_path, final_save_path)
             saved_paths.append(final_save_path)
-            log_func(f"  ✅ PDF-файл сохранен: {final_save_path}")
+            log_func(f"  ✅ PDF file saved: {final_save_path}")
 
         if take_visible_screenshot:
-            log_func(f"  🖼️ Конвертирую PDF в изображение с помощью Poppler...")
+            log_func(f"  🖼️ Converting PDF to image using Poppler...")
 
             poppler_path = r"C:\Users\Yakov\Downloads\Release-24.08.0-0\poppler-24.08.0\Library\bin"
 
@@ -184,30 +185,28 @@ def process_pdf(
                 screenshot_path = os.path.join(pdf_screenshot_dir, final_filename.replace('.pdf', '.png'))
                 images[0].save(screenshot_path, 'PNG')
                 saved_paths.append(screenshot_path)
-                log_func(f"  ✅ Скриншот PDF сохранен: {screenshot_path}")
+                log_func(f"  ✅ PDF screenshot saved: {screenshot_path}")
             else:
-                log_func(f"  ⚠️ Не удалось создать изображение из PDF.")
+                log_func(f"  ⚠️ Failed to create image from PDF.")
 
     except requests.RequestException as e:
-        log_func(f"  ❌ Не удалось скачать PDF из {url}. Ошибка: {e}")
+        log_func(f"  ❌ Failed to download PDF from {url}. Error: {e}")
     except Exception as e:
-        log_func(f"  ❌ Ошибка при обработке PDF: {e}")
+        log_func(f"  ❌ Error processing PDF: {e}")
         if "Poppler" in str(e):
-            log_func("  ... Убедитесь, что Poppler установлен и путь к нему в коде (poppler_path) указан верно.")
+            log_func("  ... Ensure Poppler is installed and the 'poppler_path' in the code is correct.")
     finally:
         if temp_pdf_path and os.path.exists(temp_pdf_path):
             try:
                 shutil.rmtree(os.path.dirname(temp_pdf_path))
             except OSError as e:
-                log_func(f"  ⚠️ Не удалось удалить временную папку: {e}")
+                log_func(f"  ⚠️ Failed to delete temp folder: {e}")
 
     return saved_paths
 
 
-# --- Вспомогательные функции (без изменений) ---
-
 def auto_scroll(page):
-    """Плавно прокручивает страницу до самого низа."""
+    """Smoothly scrolls the page to the very bottom."""
     page.evaluate("""
         async () => {
             await new Promise((resolve) => {
@@ -228,7 +227,7 @@ def auto_scroll(page):
 
 
 def sanitize_filename(url_or_filename: str) -> str:
-    """Очищает URL или имя файла для использования в качестве имени файла."""
+    """Cleans a URL or filename for use as a valid filename."""
     if "://" in url_or_filename:
         clean_name = re.sub(r'^https?://', '', url_or_filename)
     else:
@@ -239,4 +238,3 @@ def sanitize_filename(url_or_filename: str) -> str:
     if clean_name.endswith('/'):
         clean_name = clean_name[:-1]
     return clean_name[:100]
-
