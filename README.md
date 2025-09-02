@@ -1,95 +1,100 @@
-# **📸 Продвинутый Скриншотер и Архиватор Страниц**
+# **📸 Advanced Web Page Scraper & Archiver**
 
-Этот инструмент позволяет автоматически создавать скриншоты, полные копии веб\-страниц (MHTML) и обрабатывать PDF-файлы с последующей загрузкой результатов на Google Drive.
+A local web application for automatically capturing screenshots, creating full-page MHTML archives, and processing PDF files from a list of URLs, with seamless uploading to a shared Google Drive.
 
-## **✅ Возможности**
+## **Key Features**
 
-* **Обработка веб\-страниц:**
-    * Скриншот видимой части экрана.
-    * Скриншот всей страницы (с автоматической прокруткой).
-    * Возможность выбора ширины экрана для скриншотов (1920px или 1280px).
-    * Создание полного архива страницы в формате MHTML.
-    * Автоматическое закрытие cookie-баннеров по тексту на кнопке.
-* **Обработка PDF-файлов:**
-    * Сохранение PDF-файла по ссылке "как есть".
-    * Создание изображения (скриншота) первой страницы PDF.
-* **Загрузка в облако:**
-    * Автоматическая загрузка всех созданных файлов (PNG, MHTML, PDF) в указанную папку на Google Drive.
-* **Интерфейс:**
-    * Простой и понятный веб\-интерфейс для запуска и отслеживания прогресса.
+* **Multiple Capture Modes:**  
+  * Visible viewport screenshots.  
+  * Full-page screenshots (with intelligent auto-scrolling).  
+  * Full offline page archives in MHTML format.  
+* **Responsive Testing:**  
+  * Capture screenshots at different viewport widths (e.g., 1920px and 1280px).  
+* **PDF Processing:**  
+  * Download and save PDF files directly from URLs.  
+  * Generate a PNG screenshot of the first page of a PDF.  
+* **Smart Automation:**  
+  * Uses a single persistent browser session for a batch of URLs, preserving cookies and login states.  
+  * Automatically handles and closes cookie consent banners using a robust XPath selector.  
+* **Cloud Integration:**  
+  * Uploads all generated files (PNG, MHTML, PDF) to a specified shared folder in Google Drive.  
+* **Simple Web UI:**  
+  * An intuitive local web interface to input URLs, select options, and monitor progress in real-time.
 
-## **🧰 Предварительная настройка**
+## **Prerequisites**
 
-Перед первым запуском необходимо подготовить окружение.
+Before you begin, ensure you have the following installed:
 
-### **1\. Установка Poppler (для обработки PDF)**
+1. **Python 3.11+**  
+2. **Poppler:** A PDF rendering library required for creating screenshots from PDF files.  
+   * **Windows:** Download the latest release from [this page](https://github.com/oschwartz10612/poppler-windows/releases), and unzip it to a stable location (e.g., C:\\poppler).
 
-Poppler — это утилита, необходимая для конвертации PDF в изображения.
+## **Setup & Configuration**
 
-1. Скачайте архив с **Poppler для Windows** с [официальной страницы релизов](https://github.com/oschwartz10612/poppler-windows/releases). Рекомендуется последняя версия.
-2. Распакуйте архив в удобное место без кириллических символов в пути, например: C:\\poppler.
-3. **Этот шаг обязателен:** Вам нужно будет указать путь к этой папке в коде (см. раздел "Подготовка проекта").
+Follow these steps to configure the project for its first run.
 
-### **2\. Установка зависимостей Python**
+### **1\. Install Dependencies**
 
-1. Убедитесь, что у вас установлен **Python 3.11+**.
-2. Создайте и активируйте виртуальное окружение (рекомендуется):  
-   python \-m venv .venv  
-   .\\.venv\\Scripts\\activate
+It is highly recommended to use a virtual environment.
 
-3. Установите все необходимые библиотеки из файла requirements.txt:  
-   pip install \-r requirements.txt
+```bash
+# 1. Create and activate a virtual environment
+python -m venv .venv
+# On Windows
+.\.venv\Scripts\activate
+# On macOS/Linux
+# source .venv/bin/activate
 
-   *(Предполагается, что в requirements.txt есть playwright, pdf2image, requests, Flask, google-api-python-client, google-auth-httplib2, google-auth-oauthlib)*
+# 2. Install required Python packages
+pip install -r requirements.txt
 
-### **3\. Установка браузеров для Playwright**
-
-Выполните команду в терминале, чтобы скачать браузеры, которыми будет управлять Playwright.
-
+# 3. Download the necessary browser binaries for Playwright
 playwright install
+```
 
-## **🗂️ Подготовка проекта**
+### **2\. Configure Project Files**
 
-Перед запуском нужно настроить несколько параметров в файлах проекта.
+You need to edit three files to set up your specific paths and credentials.
 
-1. **credentials.json (Доступ к Google Drive)**
-    * Получите учетные данные OAuth 2.0 в [Google Cloud Console](https://console.cloud.google.com/).
-    * Сохраните скачанный файл credentials.json в корневую папку проекта.
-    * При первом запуске приложение попросит вас авторизоваться в Google-аккаунте через браузер. После этого будет создан файл token.pickle, который будет использоваться для последующих запусков.
-2. **upload\_to\_shared\_drive.py (Настройка папки Google Drive)**
-    * Откройте этот файл.
-    * Найдите строку SHARED\_DRIVE\_FOLDER\_ID \= "...".
-    * Вставьте вместо ... ID папки на вашем Google Drive, куда будут загружаться результаты.
-3. **screenshot\_playwright.py (Настройка пути к Poppler)**
-    * Откройте этот файл.
-    * Найдите строку poppler\_path \= r"C:\\path\\to\\your\\poppler\\bin".
-    * **Замените путь** на актуальный путь к папке bin внутри директории, куда вы распаковали Poppler. Например: poppler\_path \= r"C:\\poppler\\poppler-24.08.0\\Library\\bin".
+1. **Google Drive API Credentials (credentials.json)**  
+   * Go to the [Google Cloud Console](https://console.cloud.google.com/) and create OAuth 2.0 credentials for a Desktop application.  
+   * Download the credentials file and save it as credentials.json in the root directory of the project.  
+   * On the first run, the application will open a browser window asking you to authorize access to your Google account. A token.pickle file will be created to store your authorization for future sessions.  
+2. **Google Drive Folder ID (upload\_to\_shared\_drive.py)**  
+   * Open the upload\_to\_shared\_drive.py file.  
+   * Find the line SHARED\_DRIVE\_FOLDER\_ID \= "...".  
+   * Replace ... with the actual ID of the shared Google Drive folder where you want to upload the files.  
+3. **Poppler Path (screenshot\_playwright.py)**  
+   * Open the screenshot\_playwright.py file.  
+   * Find the line poppler\_path \= r"C:\\path\\to\\your\\poppler\\bin".  
+   * **Replace the path** with the correct path to the bin directory inside your Poppler installation folder. For example: poppler\_path \= r"C:\\poppler\\poppler-24.08.0\\Library\\bin".
 
-## **▶️ Запуск приложения**
+## **Running the Application**
 
-1. Убедитесь, что вы активировали виртуальное окружение (если создавали его).
-2. Запустите основной файл приложения в терминале:  
+1. Make sure your virtual environment is activated.  
+2. Run the Flask server from your terminal:
+   ```bash  
    python app\_local.py
+   ```
+4. The console will show that the server is running on http://127.0.0.1:5000.
 
-3. После запуска в консоли появится сообщение, что сервер запущен по адресу http://127.0.0.1:5000.
+## **How to Use**
 
-## **🌐 Как использовать**
+1. Open the docs/index\_local.html file in your web browser.  
+2. **Fill out the form:**  
+   * **Site Name:** Used for naming the output folder in Google Drive.  
+   * **Web Pages / PDF Files:** Paste the URLs you want to process into the appropriate text areas, one URL per line.  
+   * **Processing Options:** Select the actions you want to perform.  
+   * **Cookie Options:** If the websites have a cookie banner, check the box and provide the exact text from the consent button (e.g., Accept all).  
+3. Click the **"Start"** button.  
+4. Monitor the progress in the status log that appears below the form. When the task is complete, a link to the Google Drive folder will be displayed.
 
-1. Откройте в браузере файл docs/index\_local.html.
-2. **Заполните форму:**
-    * **Название сайта:** Используется для именования папки на Google Drive.
-    * **Поля для ссылок:** Вставьте ссылки на веб\-страницы и/или PDF в соответствующие текстовые области.
-    * **Основные опции:** Выберите, какие действия нужно выполнить (сделать скриншоты, слепки, сохранить PDF, использовать ширину 1280px).
-    * **Опции Cookie:** Если на сайтах есть cookie-баннер, отметьте опцию и введите точный текст с кнопки согласия (например, Accept all).
-3. Нажмите кнопку **"Запустить"**.
-4. Отслеживайте процесс выполнения в логе, который появится ниже. По завершении там же будет ссылка на папку в Google Drive с результатами.
+## **Troubleshooting**
 
-## **🛠️ Частые проблемы**
-
-* **Ошибка авторизации Google / token.pickle устарел:**
-    * Просто удалите файл token.pickle из корня проекта и перезапустите app\_local.py. Приложение снова попросит авторизоваться.
-* **Ошибка "Poppler not found" / PDF не конвертируются:**
-    * Убедитесь, что вы правильно скачали, распаковали Poppler и **указали верный путь** к папке bin в переменной poppler\_path в файле screenshot\_playwright.py.
-* **Файлы не загружаются на Google Drive:**
-    * Проверьте, что файл credentials.json корректен и находится в корне проекта.
-    * Убедитесь, что вы указали правильный SHARED\_DRIVE\_FOLDER\_ID в файле upload\_to\_shared\_drive.py.
+* **Google Auth Error / token.pickle is stale:**  
+  * Simply delete the token.pickle file from the project root and restart app\_local.py. The app will prompt you to re-authorize.  
+* **"Poppler not found" / PDF screenshots fail:**  
+  * Double-check that the poppler\_path variable in screenshot\_playwright.py points to the correct bin directory of your Poppler installation.  
+* **Files not uploading to Google Drive:**  
+  * Ensure credentials.json is correct and present in the project root.  
+  * Verify that the SHARED\_DRIVE\_FOLDER\_ID in upload\_to\_shared\_drive.py is correct and that your Google account has write permissions for that folder.
