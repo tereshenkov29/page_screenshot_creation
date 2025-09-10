@@ -74,7 +74,7 @@ You need to edit three files to set up your specific paths and credentials.
 1. Make sure your virtual environment is activated.  
 2. Run the Flask server from your terminal:
    ```bash  
-   python app\_local.py
+   python app\local.py
    ```
 4. The console will show that the server is running on http://127.0.0.1:5000.
 
