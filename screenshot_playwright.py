@@ -4,11 +4,13 @@ import codecs
 import shutil
 from datetime import datetime
 import requests
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Page, sync_playwright, TimeoutError as PlaywrightTimeoutError
 from pdf2image import convert_from_path
 
 
-def take_screenshot(
+# --- REFACTOR: This is the core logic, extracted into a helper function ---
+# It performs all actions on an existing page object.
+def _take_screenshot_on_page(
         page: Page,
         url: str,
         base_folder: str,
@@ -45,27 +47,16 @@ def take_screenshot(
         if handle_cookie and cookie_button_text:
             log_func(f"  🍪 Searching for cookie banner with text '{cookie_button_text}'...")
             try:
-                # --- FINAL CHANGE: Update regex to ignore leading/trailing whitespace ---
-                # The \s* allows for any number of whitespace characters before and after the text,
-                # which is a common reason for locator failure.
-
-                # Define the more robust regex
                 text_regex = re.compile(f"^\s*{re.escape(cookie_button_text)}\s*$", re.IGNORECASE)
-
-                # Define the two locators we want to try
                 button_locator = page.get_by_role("button", name=text_regex)
                 text_locator = page.get_by_text(text_regex)
-
-                # Combine them with .or_() and find the first visible one
                 combined_locator = button_locator.or_(text_locator).first
 
-                # Wait for the element to be visible and click it
                 combined_locator.wait_for(timeout=7000)
                 log_func("  ✅ Banner element found, clicking...")
                 combined_locator.click(force=True)
                 page.wait_for_timeout(1500)
                 log_func("  👍 Banner closed successfully.")
-                # --- END CHANGE ---
 
             except PlaywrightTimeoutError:
                 log_func(f"  ⚠️ Could not find a visible cookie banner element within 7 seconds.")
@@ -116,6 +107,39 @@ def take_screenshot(
             page.set_viewport_size(original_viewport_size)
 
     return saved_paths
+
+
+# --- NEW: A wrapper function for the "multi-session" mode ---
+# It handles the entire browser lifecycle for a single URL.
+def take_screenshot_in_new_session(**kwargs) -> list[str]:
+    """Launches a new browser instance to process a single URL."""
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception:
+            # Fallback to install browsers if not found
+            if 'log_func' in kwargs:
+                kwargs['log_func']("... Attempting to install Playwright browsers...")
+            os.system("playwright install")
+            browser = p.chromium.launch(headless=True)
+
+        # Determine viewport width from kwargs, default to 1920
+        use_1280_width = kwargs.get('use_1280_width', False)
+        viewport_width = 1280 if use_1280_width else 1920
+
+        context = browser.new_context(
+            viewport={"width": viewport_width, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="en-US,en;q=0.9"
+        )
+        page = context.new_page()
+
+        try:
+            # Call the core logic function with the newly created page
+            return _take_screenshot_on_page(page=page, **kwargs)
+        finally:
+            # Ensure browser is always closed
+            browser.close()
 
 
 def process_pdf(

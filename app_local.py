@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_file
-# --- ИЗМЕНЕНИЕ: Импортируем sync_playwright для управления браузером ---
 from playwright.sync_api import sync_playwright
-from screenshot_playwright import take_screenshot, process_pdf
+# --- CHANGE: Import the new and renamed functions ---
+from screenshot_playwright import _take_screenshot_on_page, take_screenshot_in_new_session, process_pdf
 from upload_to_shared_drive import upload_all_screenshots_to_shared_drive
 from flask_cors import CORS
 from zipfile import ZipFile
@@ -12,14 +12,12 @@ import datetime
 import logging
 import re
 
-# --- УЛУЧШЕНИЕ: Настройка логирования ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 CORS(app)
 
 
-# --- УЛУЧШЕНИЕ: Инкапсуляция состояния задачи для лучшей управляемости ---
 class TaskState:
     def __init__(self):
         self.log_lines = []
@@ -33,29 +31,27 @@ class TaskState:
 
     def log(self, msg):
         logging.info(msg)
-        # Ограничиваем размер лога, чтобы избежать переполнения памяти
         if len(self.log_lines) > 200:
             self.log_lines.pop(0)
         self.log_lines.append(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 
-# Глобальный объект состояния
 task_state = TaskState()
 
 
 @app.route("/create", methods=["POST"])
 def create():
-    """Эндпоинт для запуска задачи по созданию скриншотов и обработке PDF."""
+    """Endpoint to start the screenshot and PDF processing task."""
     if task_state.is_running:
-        return jsonify({"error": "⛔ Задача уже выполняется. Пожалуйста, подождите."}), 429
+        return jsonify({"error": "⛔ A task is already running. Please wait."}), 429
 
     data = request.get_json()
     if not data:
-        return jsonify({"error": "Пустой запрос"}), 400
+        return jsonify({"error": "Empty request"}), 400
 
     task_state.reset()
     task_state.is_running = True
-    task_state.log("🚀 Задача принята в работу...")
+    task_state.log("🚀 Task accepted for processing...")
 
     site_name = data.get("site", "site")
 
@@ -73,50 +69,38 @@ def create():
     handle_cookie = data.get("handle_cookie", False)
     cookie_button_text = data.get("cookie_button_text", "")
 
+    # --- NEW: Get the session mode parameter from the request ---
+    use_multi_session = data.get("use_multi_session", False)
+
     urls = [url.strip() for url in urls_text.splitlines() if url.strip()]
     pdf_urls = [url.strip() for url in pdf_urls_text.splitlines() if url.strip()]
 
     if not (urls or pdf_urls):
         task_state.is_running = False
-        return jsonify({"error": "Не указана ни одна ссылка."}), 400
+        return jsonify({"error": "No URLs provided."}), 400
     if not (visible_page or full_page or save_mhtml or save_pdf):
         task_state.is_running = False
-        return jsonify({"error": "Не выбрана ни одна опция обработки."}), 400
+        return jsonify({"error": "No processing option selected."}), 400
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
     root_dir = f"screenshots/{timestamp} - {site_name}"
     os.makedirs(root_dir, exist_ok=True)
 
     def worker():
-        """Фоновый воркер для выполнения длительных задач."""
+        """Background worker to perform long-running tasks."""
         try:
             successful_paths = []
 
-            # --- ИЗМЕНЕНИЕ: Логика запуска браузера вынесена сюда, в начало обработки URL ---
             if urls:
-                task_state.log("🖥️  Запускаю браузер для обработки веб-страниц...")
-                with sync_playwright() as p:
-                    try:
-                        browser = p.chromium.launch(headless=True)
-                    except Exception:
-                        task_state.log("... Попытка установить браузеры Playwright...")
-                        os.system("playwright install")
-                        browser = p.chromium.launch(headless=True)
-
-                    context = browser.new_context(
-                        viewport={"width": 1920, "height": 1080},
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        locale="ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
-                    )
-                    page = context.new_page()
-
-                    task_state.log(f"--- Обработка {len(urls)} веб-страниц в одной сессии ---")
-                    for url in urls:
-                        task_state.log(f"▶️  Начинаю обработку: {url}")
+                # --- CHANGE: Logic now depends on the selected session mode ---
+                if use_multi_session:
+                    # SLOW MODE: New session for each URL
+                    task_state.log(f"--- Processing {len(urls)} web pages in MULTI-SESSION mode ---")
+                    for i, url in enumerate(urls):
+                        task_state.log(f"▶️  Processing URL ({i + 1}/{len(urls)}): {url}")
                         try:
-                            # --- ИЗМЕНЕНИЕ: Передаем объект 'page' в функцию ---
-                            result_paths = take_screenshot(
-                                page=page,  # <--- Передаем созданную страницу
+                            # In this mode, we check for cookies on every page
+                            result_paths = take_screenshot_in_new_session(
                                 url=url,
                                 base_folder="screenshots",
                                 site_name=site_name,
@@ -129,18 +113,60 @@ def create():
                                 log_func=task_state.log
                             )
                             for path in result_paths:
-                                task_state.log(f"  ✅ Файл сохранен: {os.path.basename(path)}")
+                                task_state.log(f"  ✅ File saved: {os.path.basename(path)}")
                             successful_paths.extend(result_paths)
                         except Exception as e:
-                            task_state.log(f"❌ Ошибка при обработке страницы {url}: {e}")
+                            task_state.log(f"❌ Error processing page {url}: {e}")
+                else:
+                    # FAST MODE: Single session for all URLs (default behavior)
+                    task_state.log(f"--- Processing {len(urls)} web pages in SINGLE-SESSION mode ---")
+                    task_state.log("🖥️  Launching browser for web page processing...")
+                    with sync_playwright() as p:
+                        try:
+                            browser = p.chromium.launch(headless=True)
+                        except Exception:
+                            task_state.log("... Attempting to install Playwright browsers...")
+                            os.system("playwright install")
+                            browser = p.chromium.launch(headless=True)
 
-                    task_state.log("🚪 Закрываю браузер...")
-                    browser.close()  # Закрываем браузер после цикла
+                        context = browser.new_context(
+                            viewport={"width": 1920, "height": 1080},
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                            locale="en-US,en;q=0.9"
+                        )
+                        page = context.new_page()
+
+                        for i, url in enumerate(urls):
+                            task_state.log(f"▶️  Processing URL ({i + 1}/{len(urls)}): {url}")
+                            try:
+                                # Only check for the cookie on the very first page
+                                should_check_cookie = handle_cookie and (i == 0)
+                                result_paths = _take_screenshot_on_page(
+                                    page=page,
+                                    url=url,
+                                    base_folder="screenshots",
+                                    site_name=site_name,
+                                    full_page=full_page,
+                                    visible_only=visible_page,
+                                    save_mhtml=save_mhtml,
+                                    use_1280_width=use_1280_width,
+                                    handle_cookie=should_check_cookie,
+                                    cookie_button_text=cookie_button_text,
+                                    log_func=task_state.log
+                                )
+                                for path in result_paths:
+                                    task_state.log(f"  ✅ File saved: {os.path.basename(path)}")
+                                successful_paths.extend(result_paths)
+                            except Exception as e:
+                                task_state.log(f"❌ Error processing page {url}: {e}")
+
+                        task_state.log("🚪 Closing browser...")
+                        browser.close()
 
             if pdf_urls:
-                task_state.log(f"--- Обработка {len(pdf_urls)} PDF-файлов ---")
+                task_state.log(f"--- Processing {len(pdf_urls)} PDF files ---")
                 for url in pdf_urls:
-                    task_state.log(f"▶️  Начинаю обработку PDF: {url}")
+                    task_state.log(f"▶️  Processing PDF: {url}")
                     try:
                         result_paths = process_pdf(
                             url=url,
@@ -152,27 +178,27 @@ def create():
                         )
                         successful_paths.extend(result_paths)
                     except Exception as e:
-                        task_state.log(f"❌ Ошибка при обработке PDF {url}: {e}")
+                        task_state.log(f"❌ Error processing PDF {url}: {e}")
 
             if successful_paths:
-                task_state.log("☁️ Загружаю файлы в Shared Drive...")
+                task_state.log("☁️ Uploading files to Shared Drive...")
                 try:
                     folder_link_url = upload_all_screenshots_to_shared_drive(root_dir)
                     if folder_link_url:
-                        task_state.log(f"📁 Ссылка на папку: {folder_link_url}")
+                        task_state.log(f"📁 Folder link: {folder_link_url}")
                         task_state.folder_link = folder_link_url
                     else:
-                        task_state.log("⚠️ Не удалось получить ссылку на папку после загрузки.")
+                        task_state.log("⚠️ Could not retrieve folder link after upload.")
                 except Exception as upload_e:
-                    task_state.log(f"❌ Ошибка при загрузке на Google Drive: {upload_e}")
+                    task_state.log(f"❌ Error during Google Drive upload: {upload_e}")
             else:
-                task_state.log("⚠️ Ни одного файла не было создано. Проверьте ссылки и настройки.")
+                task_state.log("⚠️ No files were created. Please check URLs and settings.")
 
         except Exception as e:
-            task_state.log(f"❌ Критическая ошибка в задаче: {e}")
+            task_state.log(f"❌ A critical error occurred in the task: {e}")
         finally:
             task_state.is_running = False
-            task_state.log("🎉 Задача завершена.")
+            task_state.log("🎉 Task finished.")
 
     threading.Thread(target=worker).start()
     return jsonify({"status": "started"})
@@ -180,7 +206,7 @@ def create():
 
 @app.route("/status")
 def status():
-    """Эндпоинт для получения текущего статуса задачи."""
+    """Endpoint to get the current task status."""
     return jsonify({
         "log": task_state.log_lines,
         "done": not task_state.is_running,
@@ -190,10 +216,10 @@ def status():
 
 @app.route("/download")
 def download_zip():
-    """Эндпоинт для скачивания всех созданных файлов в виде zip-архива."""
+    """Endpoint to download all created files as a zip archive."""
     screenshots_dir = "screenshots"
     if not os.path.exists(screenshots_dir) or not os.listdir(screenshots_dir):
-        return "Нет файлов для скачивания.", 404
+        return "No files to download.", 404
 
     memory_file = io.BytesIO()
     with ZipFile(memory_file, 'w') as zf:
@@ -209,3 +235,4 @@ def download_zip():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+

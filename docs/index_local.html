@@ -72,6 +72,11 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+        .label-note {
+            font-weight: normal;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
         pre {
             background: #e9ecef;
             padding: 15px;
@@ -127,7 +132,6 @@
 <div class="container">
     <h1>📸 Создание скриншотов и слепков</h1>
 
-    <!-- === ДОБАВЛЕНА МЕТКА (LABEL) === -->
     <label for="siteName">Название сайта (для имени папки)</label>
     <input type="text" id="siteName" placeholder="Введите название сайта (например: docs.google.com)" />
 
@@ -146,6 +150,12 @@
         <label><input type="checkbox" id="optionMHTML" />Сделать слепок страницы (MHTML, только для веб-страниц)</label>
         <label><input type="checkbox" id="optionSavePdf" />Сохранить PDF как есть (слепок файла)</label>
         <label><input type="checkbox" id="optionWidth1280" />Сделать скриншот на ширине 1280px</label>
+
+        <!-- === NEW CHECKBOX FOR SESSION MODE === -->
+        <label>
+            <input type="checkbox" id="optionMultiSession" />Использовать отдельный сеанс для каждой страницы
+            <span class="label-note">(медленнее, для сайтов с защитой от ботов)</span>
+        </label>
     </fieldset>
 
     <fieldset class="options-group">
@@ -158,7 +168,6 @@
         </div>
     </fieldset>
 
-    <!-- === ДОБАВЛЕНА КНОПКА ОЧИСТКИ И КОНТЕЙНЕР ДЛЯ КНОПОК === -->
     <div class="button-container">
         <button id="startButton" onclick="startProcessing()" class="primary-button">Запустить</button>
         <button type="button" onclick="clearInputs()" class="secondary-button">Очистить поля</button>
@@ -178,13 +187,11 @@
     const optionFullCheckbox = document.getElementById('optionFull');
     const pdfUrlsTextarea = document.getElementById('pdf_urls');
 
-    // === НОВАЯ ФУНКЦИЯ ОЧИСТКИ ПОЛЕЙ ===
     function clearInputs() {
         document.getElementById('siteName').value = '';
         document.getElementById('urls').value = '';
         document.getElementById('pdf_urls').value = '';
         document.getElementById('cookieButtonText').value = '';
-        // Чекбоксы не трогаем, как и просили
     }
 
     function checkPdfOptions() {
@@ -217,6 +224,9 @@
         const mhtml = document.getElementById('optionMHTML').checked;
         const save_pdf = document.getElementById('optionSavePdf').checked;
         const use1280width = document.getElementById('optionWidth1280').checked;
+
+        // --- GET VALUE FROM NEW CHECKBOX ---
+        const use_multi_session = document.getElementById('optionMultiSession').checked;
 
         const handleCookie = document.getElementById('handleCookie').checked;
         const cookieButtonText = document.getElementById('cookieButtonText').value.trim();
@@ -259,7 +269,9 @@
                 save_pdf: save_pdf,
                 handle_cookie: handleCookie,
                 cookie_button_text: cookieButtonText,
-                use_1280_width: use1280width
+                use_1280_width: use1280width,
+                // --- SEND NEW PARAMETER TO BACKEND ---
+                use_multi_session: use_multi_session
             })
         })
             .then(res => {
