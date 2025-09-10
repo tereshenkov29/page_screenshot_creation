@@ -45,15 +45,30 @@ def take_screenshot(
         if handle_cookie and cookie_button_text:
             log_func(f"  🍪 Searching for cookie banner with text '{cookie_button_text}'...")
             try:
-                cookie_button = page.locator(
-                    f"xpath=//*[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{cookie_button_text.lower()}')]").first
-                cookie_button.wait_for(timeout=7000)
-                log_func("  ✅ Banner found, clicking...")
-                cookie_button.click(force=True)
+                # --- FINAL CHANGE: Update regex to ignore leading/trailing whitespace ---
+                # The \s* allows for any number of whitespace characters before and after the text,
+                # which is a common reason for locator failure.
+
+                # Define the more robust regex
+                text_regex = re.compile(f"^\s*{re.escape(cookie_button_text)}\s*$", re.IGNORECASE)
+
+                # Define the two locators we want to try
+                button_locator = page.get_by_role("button", name=text_regex)
+                text_locator = page.get_by_text(text_regex)
+
+                # Combine them with .or_() and find the first visible one
+                combined_locator = button_locator.or_(text_locator).first
+
+                # Wait for the element to be visible and click it
+                combined_locator.wait_for(timeout=7000)
+                log_func("  ✅ Banner element found, clicking...")
+                combined_locator.click(force=True)
                 page.wait_for_timeout(1500)
                 log_func("  👍 Banner closed successfully.")
+                # --- END CHANGE ---
+
             except PlaywrightTimeoutError:
-                log_func(f"  ⚠️ Could not find a visible cookie banner button within 7 seconds.")
+                log_func(f"  ⚠️ Could not find a visible cookie banner element within 7 seconds.")
             except Exception as e:
                 log_func(f"  ❌ An error occurred while handling the cookie banner: {e}")
 
@@ -123,7 +138,6 @@ def process_pdf(
     try:
         log_func(f"  📄 Downloading PDF for processing: {url}")
 
-        # --- CHANGE: Use a more comprehensive set of headers to mimic a real browser ---
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -131,10 +145,9 @@ def process_pdf(
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
-            'DNT': '1'  # Do Not Track
+            'DNT': '1'
         }
         response = requests.get(url, timeout=60, headers=headers)
-        # --- END CHANGE ---
 
         response.raise_for_status()
 
@@ -238,3 +251,4 @@ def sanitize_filename(url_or_filename: str) -> str:
     if clean_name.endswith('/'):
         clean_name = clean_name[:-1]
     return clean_name[:100]
+
