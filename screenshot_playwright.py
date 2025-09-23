@@ -6,10 +6,43 @@ from datetime import datetime
 import requests
 from playwright.sync_api import Page, sync_playwright, TimeoutError as PlaywrightTimeoutError
 from pdf2image import convert_from_path
+# --- NEW: Import urlparse to easily handle URL paths ---
+from urllib.parse import urlparse
 
 
-# --- REFACTOR: This is the core logic, extracted into a helper function ---
-# It performs all actions on an existing page object.
+# --- NEW: Helper function to generate short, report-friendly filenames ---
+def _generate_report_filename(url: str) -> str:
+    """Generates a short, report-friendly filename from a URL."""
+    try:
+        path = urlparse(url).path
+        # Remove leading/trailing slashes and get the last part
+        path = path.strip('/')
+        if not path:
+            return "homepage.png"
+
+        # Get the last segment of the path
+        last_part = path.split('/')[-1]
+        # Handles URLs ending with a slash like /path/
+        if not last_part and len(path.split('/')) > 1:
+            last_part = path.split('/')[-2]
+
+        # Remove query parameters from the last part
+        last_part = last_part.split('?')[0]
+
+        # Replace hyphens with underscores
+        filename = last_part.replace('-', '_')
+
+        # Ensure it ends with .png
+        if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            filename += ".png"
+
+        # --- CHANGE: Convert the final filename to lowercase ---
+        return filename.lower()
+    except Exception:
+        # Fallback for any unexpected URL format
+        return "screenshot.png"
+
+
 def _take_screenshot_on_page(
         page: Page,
         url: str,
@@ -69,8 +102,19 @@ def _take_screenshot_on_page(
             visible_dir = os.path.join(root_folder, f"visible_page_screenshots{folder_suffix}")
             os.makedirs(visible_dir, exist_ok=True)
             visible_path = os.path.join(visible_dir, f"{timestamp}_{safe_url}.png")
-            page.screenshot(path=visible_path, full_page=False)
+
+            screenshot_bytes = page.screenshot(full_page=False)
+            with open(visible_path, 'wb') as f:
+                f.write(screenshot_bytes)
             saved_paths.append(visible_path)
+
+            images_dir = os.path.join(root_folder, "images")
+            os.makedirs(images_dir, exist_ok=True)
+            report_filename = _generate_report_filename(url)
+            report_filepath = os.path.join(images_dir, report_filename)
+            with open(report_filepath, 'wb') as f:
+                f.write(screenshot_bytes)
+            log_func(f"  🖼️  Copied screenshot for report as: {report_filename}")
 
         if full_page or save_mhtml:
             if not scrolled:
@@ -109,21 +153,17 @@ def _take_screenshot_on_page(
     return saved_paths
 
 
-# --- NEW: A wrapper function for the "multi-session" mode ---
-# It handles the entire browser lifecycle for a single URL.
 def take_screenshot_in_new_session(**kwargs) -> list[str]:
     """Launches a new browser instance to process a single URL."""
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(headless=True)
         except Exception:
-            # Fallback to install browsers if not found
             if 'log_func' in kwargs:
                 kwargs['log_func']("... Attempting to install Playwright browsers...")
             os.system("playwright install")
             browser = p.chromium.launch(headless=True)
 
-        # Determine viewport width from kwargs, default to 1920
         use_1280_width = kwargs.get('use_1280_width', False)
         viewport_width = 1280 if use_1280_width else 1920
 
@@ -135,10 +175,8 @@ def take_screenshot_in_new_session(**kwargs) -> list[str]:
         page = context.new_page()
 
         try:
-            # Call the core logic function with the newly created page
             return _take_screenshot_on_page(page=page, **kwargs)
         finally:
-            # Ensure browser is always closed
             browser.close()
 
 
@@ -146,6 +184,7 @@ def process_pdf(
         url: str,
         base_folder: str,
         site_name: str,
+        pdf_counter: int,
         take_visible_screenshot: bool = False,
         save_as_is: bool = False,
         log_func=print
@@ -223,6 +262,14 @@ def process_pdf(
                 images[0].save(screenshot_path, 'PNG')
                 saved_paths.append(screenshot_path)
                 log_func(f"  ✅ PDF screenshot saved: {screenshot_path}")
+
+                images_dir = os.path.join(root_folder, "images")
+                os.makedirs(images_dir, exist_ok=True)
+                report_filename = f"pdf{pdf_counter}.png"
+                report_filepath = os.path.join(images_dir, report_filename)
+                images[0].save(report_filepath, 'PNG')
+                log_func(f"  🖼️  Copied PDF screenshot for report as: {report_filename}")
+
             else:
                 log_func(f"  ⚠️ Failed to create image from PDF.")
 

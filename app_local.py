@@ -69,7 +69,6 @@ def create():
     handle_cookie = data.get("handle_cookie", False)
     cookie_button_text = data.get("cookie_button_text", "")
 
-    # --- NEW: Get the session mode parameter from the request ---
     use_multi_session = data.get("use_multi_session", False)
 
     urls = [url.strip() for url in urls_text.splitlines() if url.strip()]
@@ -92,14 +91,11 @@ def create():
             successful_paths = []
 
             if urls:
-                # --- CHANGE: Logic now depends on the selected session mode ---
                 if use_multi_session:
-                    # SLOW MODE: New session for each URL
                     task_state.log(f"--- Processing {len(urls)} web pages in MULTI-SESSION mode ---")
                     for i, url in enumerate(urls):
                         task_state.log(f"▶️  Processing URL ({i + 1}/{len(urls)}): {url}")
                         try:
-                            # In this mode, we check for cookies on every page
                             result_paths = take_screenshot_in_new_session(
                                 url=url,
                                 base_folder="screenshots",
@@ -118,7 +114,6 @@ def create():
                         except Exception as e:
                             task_state.log(f"❌ Error processing page {url}: {e}")
                 else:
-                    # FAST MODE: Single session for all URLs (default behavior)
                     task_state.log(f"--- Processing {len(urls)} web pages in SINGLE-SESSION mode ---")
                     task_state.log("🖥️  Launching browser for web page processing...")
                     with sync_playwright() as p:
@@ -139,7 +134,6 @@ def create():
                         for i, url in enumerate(urls):
                             task_state.log(f"▶️  Processing URL ({i + 1}/{len(urls)}): {url}")
                             try:
-                                # Only check for the cookie on the very first page
                                 should_check_cookie = handle_cookie and (i == 0)
                                 result_paths = _take_screenshot_on_page(
                                     page=page,
@@ -165,18 +159,24 @@ def create():
 
             if pdf_urls:
                 task_state.log(f"--- Processing {len(pdf_urls)} PDF files ---")
+                # --- NEW: Initialize a counter for PDF files ---
+                pdf_counter = 1
                 for url in pdf_urls:
-                    task_state.log(f"▶️  Processing PDF: {url}")
+                    task_state.log(f"▶️  Processing PDF ({pdf_counter}/{len(pdf_urls)}): {url}")
                     try:
+                        # --- CHANGE: Pass the counter to the process_pdf function ---
                         result_paths = process_pdf(
                             url=url,
                             base_folder="screenshots",
                             site_name=site_name,
+                            pdf_counter=pdf_counter,
                             take_visible_screenshot=visible_page,
                             save_as_is=save_pdf,
                             log_func=task_state.log
                         )
                         successful_paths.extend(result_paths)
+                        # --- NEW: Increment the counter after processing ---
+                        pdf_counter += 1
                     except Exception as e:
                         task_state.log(f"❌ Error processing PDF {url}: {e}")
 
